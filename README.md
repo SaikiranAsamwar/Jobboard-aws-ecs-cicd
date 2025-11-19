@@ -174,7 +174,9 @@ kubectl apply -f k8s/postgres-deployment.yaml
 This creates:
 - PostgreSQL deployment (1 replica)
 - PostgreSQL service
-- Persistent Volume Claim (10Gi)
+- Storage using emptyDir (ephemeral storage)
+
+**Note**: For production, configure EBS CSI driver and use PersistentVolumeClaim for data persistence.
 
 ### 3. Deploy Backend
 
@@ -225,12 +227,54 @@ kubectl logs -f deployment/jobboard-frontend
 
 ### 7. Access the Application
 
-```bash
-# Get the external IP or Load Balancer URL
-kubectl get ingress jobboard-ingress
+**Option A: Using AWS Load Balancer Controller** (Requires installation)
 
-# Access via the provided URL
+```bash
+# Install AWS Load Balancer Controller first
+# https://kubernetes-sigs.github.io/aws-load-balancer-controller/
+
+# Get the Load Balancer URL
+kubectl get ingress jobboard-ingress
 ```
+
+**Option B: Port Forwarding** (Quick Testing)
+
+```bash
+# Forward frontend port
+kubectl port-forward service/jobboard-frontend 3000:80
+
+# In another terminal, forward backend port
+kubectl port-forward service/jobboard-backend 4000:4000
+
+# Access the application at http://localhost:3000
+```
+
+### 8. Troubleshooting Kubernetes Deployment
+
+**Check Pod Status:**
+```bash
+kubectl get pods
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
+```
+
+**Common Issues:**
+
+1. **Backend CrashLoopBackOff**: Check if PostgreSQL is running
+   ```bash
+   kubectl logs deployment/jobboard-backend
+   ```
+
+2. **ImagePullBackOff**: Ensure Docker images are pushed to Docker Hub
+   ```bash
+   docker push saikiranasamwar4/jobboard-backend:latest
+   docker push saikiranasamwar4/jobboard-frontend:latest
+   ```
+
+3. **PVC Pending**: If using PVC, ensure EBS CSI driver is installed on EKS
+   ```bash
+   kubectl get pvc
+   ```
 
 ## 📡 API Documentation
 
