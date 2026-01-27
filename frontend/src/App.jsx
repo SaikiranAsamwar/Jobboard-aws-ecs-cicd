@@ -1,32 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import Jobs from './pages/Jobs.jsx';
 import Login from './pages/login.jsx';
+import JobSeekerDashboard from './pages/JobSeekerDashboard.jsx';
+import RecruiterDashboard from './pages/RecruiterDashboard.jsx';
+import Profile from './pages/Profile.jsx';
 import './App.css';
 
 export default function App(){
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentView, setCurrentView] = useState('jobs');
+  const [currentView, setCurrentView] = useState('dashboard');
   const [userEmail, setUserEmail] = useState('');
+  const [userType, setUserType] = useState('jobseeker');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     const email = localStorage.getItem('userEmail');
+    const type = localStorage.getItem('userType');
     setIsLoggedIn(!!token);
     setUserEmail(email || '');
+    setUserType(type || 'jobseeker');
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
+    localStorage.removeItem('userType');
     setIsLoggedIn(false);
     setUserEmail('');
-    setCurrentView('jobs');
+    setUserType('jobseeker');
+    setCurrentView('dashboard');
   };
 
-  const handleLoginSuccess = (email) => {
+  const handleLoginSuccess = (email, type) => {
+    console.log('Login success - Email:', email, 'Type:', type);
     setIsLoggedIn(true);
     setUserEmail(email);
+    setUserType(type || 'jobseeker');
     localStorage.setItem('userEmail', email);
+    localStorage.setItem('userType', type || 'jobseeker');
+    console.log('UserType set to:', type || 'jobseeker');
   };
 
   const renderContent = () => {
@@ -35,85 +47,15 @@ export default function App(){
     }
 
     switch(currentView) {
+      case 'dashboard':
+        console.log('Rendering dashboard for userType:', userType);
+        return userType === 'recruiter' 
+          ? <RecruiterDashboard userEmail={userEmail} />
+          : <JobSeekerDashboard userEmail={userEmail} />;
       case 'jobs':
         return <Jobs />;
       case 'profile':
-        return (
-          <div className="content-section">
-            <div className="container">
-              <h2 className="mb-4"><i className="bi bi-person-circle me-3"></i>My Profile</h2>
-              <div className="row">
-                <div className="col-lg-4 mb-4">
-                  <div className="card shadow-lg">
-                    <div className="card-body text-center p-5">
-                      <div className="mb-4">
-                        <i className="bi bi-person-circle" style={{fontSize: '100px', color: '#667eea'}}></i>
-                      </div>
-                      <h4 className="mb-2">{userEmail}</h4>
-                      <p className="text-muted mb-4">Job Seeker</p>
-                      <div className="d-grid gap-2">
-                        <button className="btn btn-outline-primary">
-                          <i className="bi bi-pencil me-2"></i>Edit Profile
-                        </button>
-                        <button className="btn btn-outline-danger" onClick={handleLogout}>
-                          <i className="bi bi-box-arrow-right me-2"></i>Logout
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-lg-8 mb-4">
-                  <div className="card shadow-lg mb-4">
-                    <div className="card-header bg-white">
-                      <h5 className="mb-0"><i className="bi bi-info-circle me-2"></i>Profile Information</h5>
-                    </div>
-                    <div className="card-body p-4">
-                      <div className="row mb-3">
-                        <div className="col-md-4">
-                          <strong><i className="bi bi-envelope me-2"></i>Email:</strong>
-                        </div>
-                        <div className="col-md-8">
-                          {userEmail}
-                        </div>
-                      </div>
-                      <div className="row mb-3">
-                        <div className="col-md-4">
-                          <strong><i className="bi bi-calendar me-2"></i>Member Since:</strong>
-                        </div>
-                        <div className="col-md-8">
-                          November 2025
-                        </div>
-                      </div>
-                      <div className="row mb-3">
-                        <div className="col-md-4">
-                          <strong><i className="bi bi-shield-check me-2"></i>Account Status:</strong>
-                        </div>
-                        <div className="col-md-8">
-                          <span className="badge bg-success">Active</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="card shadow-lg">
-                    <div className="card-header bg-white">
-                      <h5 className="mb-0"><i className="bi bi-file-earmark-text me-2"></i>Application History</h5>
-                    </div>
-                    <div className="card-body p-4">
-                      <div className="alert alert-info">
-                        <i className="bi bi-info-circle me-2"></i>
-                        Your application history will appear here once you apply to jobs.
-                      </div>
-                      <button className="btn btn-primary" onClick={() => setCurrentView('jobs')}>
-                        <i className="bi bi-briefcase me-2"></i>Browse Jobs
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+        return <Profile userEmail={userEmail} userType={userType} onLogout={handleLogout} />;
       case 'about':
         return (
           <div className="content-section">
@@ -203,14 +145,14 @@ export default function App(){
     <div className="app">
       <header className="app-header">
         <div className="header-content">
-          <div className="logo" style={{cursor: 'pointer'}} onClick={() => setCurrentView('jobs')}>
+          <div className="logo" style={{cursor: 'pointer'}} onClick={() => setCurrentView('dashboard')}>
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
               <rect width="40" height="40" rx="8" fill="url(#gradient)" />
               <path d="M12 16h16M12 24h10" stroke="white" strokeWidth="2" strokeLinecap="round" />
               <defs>
                 <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
-                  <stop offset="0%" stopColor="#667eea" />
-                  <stop offset="100%" stopColor="#764ba2" />
+                  <stop offset="0%" stopColor="#4A90E2" />
+                  <stop offset="100%" stopColor="#87CEEB" />
                 </linearGradient>
               </defs>
             </svg>
@@ -220,25 +162,25 @@ export default function App(){
             {isLoggedIn && (
               <>
                 <a 
+                  href="#dashboard" 
+                  className={currentView === 'dashboard' ? 'active' : ''}
+                  onClick={(e) => { e.preventDefault(); setCurrentView('dashboard'); }}
+                >
+                  <i className="bi bi-speedometer2 me-1"></i>Dashboard
+                </a>
+                <a 
                   href="#jobs" 
                   className={currentView === 'jobs' ? 'active' : ''}
                   onClick={(e) => { e.preventDefault(); setCurrentView('jobs'); }}
                 >
-                  <i className="bi bi-briefcase me-1"></i>Jobs
+                  <i className="bi bi-briefcase me-1"></i>All Jobs
                 </a>
                 <a 
-                  href="#about"
-                  className={currentView === 'about' ? 'active' : ''}
-                  onClick={(e) => { e.preventDefault(); setCurrentView('about'); }}
+                  href="#profile"
+                  className={currentView === 'profile' ? 'active' : ''}
+                  onClick={(e) => { e.preventDefault(); setCurrentView('profile'); }}
                 >
-                  <i className="bi bi-info-circle me-1"></i>About
-                </a>
-                <a 
-                  href="#contact"
-                  className={currentView === 'contact' ? 'active' : ''}
-                  onClick={(e) => { e.preventDefault(); setCurrentView('contact'); }}
-                >
-                  <i className="bi bi-envelope me-1"></i>Contact
+                  <i className="bi bi-person me-1"></i>Profile
                 </a>
                 <div 
                   className="user-info" 
@@ -248,6 +190,7 @@ export default function App(){
                 >
                   <i className="bi bi-person-circle me-2"></i>
                   <span>{userEmail || 'User'}</span>
+                  <span className="ms-2 badge bg-info">{userType === 'recruiter' ? 'Recruiter' : 'Job Seeker'}</span>
                 </div>
                 <button className="btn-secondary" onClick={handleLogout}>
                   <i className="bi bi-box-arrow-right me-1"></i>Logout

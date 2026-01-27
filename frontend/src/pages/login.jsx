@@ -4,6 +4,7 @@ import './Login.css';
 export default function Login({ onLoginSuccess }){
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [userType, setUserType] = useState('jobseeker');
   const [isSignup, setIsSignup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,16 +26,23 @@ export default function Login({ onLoginSuccess }){
     
     try {
       const endpoint = isSignup ? '/auth/register' : '/auth/login';
+      const body = isSignup 
+        ? { email, password, userType }
+        : { email, password };
+        
       const res = await fetch((import.meta.env.VITE_API_URL || '/api') + endpoint, {
         method: 'POST', 
         headers: {'Content-Type': 'application/json'}, 
-        body: JSON.stringify({email, password})
+        body: JSON.stringify(body)
       });
       const data = await res.json();
+      console.log('Login/Signup response:', data);
       
       if(data.token) {
         localStorage.setItem('token', data.token);
-        onLoginSuccess?.(email);
+        localStorage.setItem('userType', data.userType || userType);
+        console.log('Calling onLoginSuccess with:', email, data.userType || userType);
+        onLoginSuccess?.(email, data.userType || userType);
       } else {
         setError(data.error || 'Authentication failed');
       }
@@ -54,6 +62,22 @@ export default function Login({ onLoginSuccess }){
         </div>
 
         <form onSubmit={submit} className={`login-form needs-validation ${validated ? 'was-validated' : ''}`} noValidate>
+          {isSignup && (
+            <div className="form-group mb-3">
+              <label htmlFor="userType" className="form-label">I am a</label>
+              <select
+                id="userType"
+                className="form-control"
+                value={userType}
+                onChange={e => setUserType(e.target.value)}
+                required
+              >
+                <option value="jobseeker">Job Seeker</option>
+                <option value="recruiter">Recruiter</option>
+              </select>
+            </div>
+          )}
+
           <div className="form-group mb-3">
             <label htmlFor="email" className="form-label">Email Address</label>
             <input 

@@ -6,11 +6,16 @@ const router = express.Router();
 
 router.post('/signup', async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, userType } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, password: hashedPassword, role: role || 'user' });
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET || 'devsecret', { expiresIn: '7d' });
-    res.json({ token, id: user.id, email: user.email });
+    const user = await User.create({ 
+      email, 
+      password: hashedPassword, 
+      role: role || 'user',
+      userType: userType || 'jobseeker'
+    });
+    const token = jwt.sign({ id: user.id, role: user.role, userType: user.userType }, process.env.JWT_SECRET || 'devsecret', { expiresIn: '7d' });
+    res.json({ token, id: user.id, email: user.email, userType: user.userType });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -19,11 +24,16 @@ router.post('/signup', async (req, res) => {
 // Alias for signup
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, userType } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, password: hashedPassword, role: role || 'user' });
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET || 'devsecret', { expiresIn: '7d' });
-    res.json({ token, id: user.id, email: user.email });
+    const user = await User.create({ 
+      email, 
+      password: hashedPassword, 
+      role: role || 'user',
+      userType: userType || 'jobseeker'
+    });
+    const token = jwt.sign({ id: user.id, role: user.role, userType: user.userType }, process.env.JWT_SECRET || 'devsecret', { expiresIn: '7d' });
+    res.json({ token, id: user.id, email: user.email, userType: user.userType });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -36,8 +46,8 @@ router.post('/login', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'invalid credentials' });
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) return res.status(401).json({ error: 'invalid credentials' });
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET || 'devsecret', { expiresIn: '7d' });
-    res.json({ token });
+    const token = jwt.sign({ id: user.id, role: user.role, userType: user.userType }, process.env.JWT_SECRET || 'devsecret', { expiresIn: '7d' });
+    res.json({ token, userType: user.userType, email: user.email });
   } catch (err) {
     res.status(500).json({ error: 'server error' });
   }

@@ -17,7 +17,11 @@ const User = sequelize.define('User', {
   email: { type: DataTypes.STRING, unique: true, allowNull: false },
   password: { type: DataTypes.STRING, allowNull: false },
   name: { type: DataTypes.STRING },
-  role: { type: DataTypes.STRING, defaultValue: 'user' }
+  phone: { type: DataTypes.STRING },
+  location: { type: DataTypes.STRING },
+  bio: { type: DataTypes.TEXT },
+  role: { type: DataTypes.STRING, defaultValue: 'user' },
+  userType: { type: DataTypes.STRING, allowNull: false, defaultValue: 'jobseeker' } // 'jobseeker' or 'recruiter'
 });
 
 const Job = sequelize.define('Job', {

@@ -7,14 +7,32 @@ async function seed() {
     await sequelize.sync({ force: true }); // Reset database
     console.log('Database synced');
 
-    // Create sample user
+    // Create sample users
     const hashedPassword = await bcrypt.hash('password123', 10);
-    const user = await User.create({
+    
+    const admin = await User.create({
       email: 'admin@jobboard.com',
       password: hashedPassword,
-      role: 'admin'
+      role: 'admin',
+      userType: 'recruiter'
     });
-    console.log('Created admin user');
+    console.log('Created admin user (recruiter)');
+
+    const recruiter = await User.create({
+      email: 'recruiter@jobboard.com',
+      password: hashedPassword,
+      role: 'user',
+      userType: 'recruiter'
+    });
+    console.log('Created recruiter user');
+
+    const jobSeeker = await User.create({
+      email: 'jobseeker@jobboard.com',
+      password: hashedPassword,
+      role: 'user',
+      userType: 'jobseeker'
+    });
+    console.log('Created job seeker user');
 
     // Create sample jobs
     const jobs = [
@@ -22,49 +40,57 @@ async function seed() {
         title: 'Senior Full Stack Developer',
         description: 'We are looking for an experienced Full Stack Developer to join our dynamic team. You will be responsible for developing and maintaining web applications using modern technologies.',
         location: 'San Francisco, CA',
-        userId: user.id
+        company: 'TechCorp Inc.',
+        userId: recruiter.id
       },
       {
         title: 'Frontend React Developer',
         description: 'Join our team as a React Developer! Build beautiful, responsive user interfaces and work with cutting-edge technologies.',
         location: 'Remote',
-        userId: user.id
+        company: 'WebDev Solutions',
+        userId: recruiter.id
       },
       {
         title: 'Backend Node.js Engineer',
         description: 'Seeking a talented Backend Engineer with Node.js expertise. Design and implement scalable APIs and microservices.',
         location: 'New York, NY',
-        userId: user.id
+        company: 'CloudTech Systems',
+        userId: admin.id
       },
       {
         title: 'DevOps Engineer',
         description: 'Help us build and maintain our cloud infrastructure. Experience with AWS, Docker, and Kubernetes required.',
         location: 'Austin, TX',
-        userId: user.id
+        company: 'Infrastructure Pro',
+        userId: admin.id
       },
       {
         title: 'UI/UX Designer',
         description: 'Creative UI/UX Designer needed to craft amazing user experiences. Strong portfolio and Figma skills required.',
         location: 'Los Angeles, CA',
-        userId: user.id
+        company: 'Design Studio',
+        userId: recruiter.id
       },
       {
         title: 'Data Scientist',
         description: 'Analyze large datasets and build machine learning models to drive business insights.',
         location: 'Boston, MA',
-        userId: user.id
+        company: 'DataTech Analytics',
+        userId: admin.id
       },
       {
         title: 'Mobile App Developer',
         description: 'Develop native and cross-platform mobile applications using React Native or Flutter.',
         location: 'Seattle, WA',
-        userId: user.id
+        company: 'MobileFirst Apps',
+        userId: recruiter.id
       },
       {
         title: 'Product Manager',
         description: 'Lead product development from concept to launch. Define roadmaps and work with cross-functional teams.',
         location: 'Remote',
-        userId: user.id
+        company: 'Innovation Labs',
+        userId: admin.id
       }
     ];
 
