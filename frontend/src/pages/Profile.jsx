@@ -9,8 +9,7 @@ function Profile({ userEmail, userType, onLogout }) {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    email: userEmail,
-    phone: '',
+    email: userEmail,    phone: '',
     location: '',
     bio: ''
   });

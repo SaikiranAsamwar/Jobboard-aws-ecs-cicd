@@ -27,7 +27,7 @@ This application consists of:
 - **Frontend**: React.js with Vite, served via Nginx
 - **Backend**: Node.js with Express, Sequelize ORM
 - **Database**: PostgreSQL (RDS)
-- **Deployment**: AWS ECS Fargate with Blue/Green deployment
+- **Deployment**: AWS ECS on EC2 (Amazon Linux 2023) with Blue/Green deployment
 - **CI/CD**: CodePipeline → CodeBuild → CodeDeploy
 
 ---
@@ -35,7 +35,7 @@ This application consists of:
 ## Architecture
 
 ```
-GitHub Repository
+AWS CodeCommit Repository
        ↓
 CodePipeline (Orchestration)
        ↓
@@ -94,15 +94,23 @@ Users
 
 ## Part 1: Local Development Setup
 
-### Step 1.1: Clone the Repository
+### Step 1.1: Get the Application Code
 
 ```bash
 # Navigate to your projects directory
 cd /path/to/your/projects
 
-# Clone your repository (replace with your repo URL)
-git clone https://github.com/yourusername/jobboard.git
+# Option 1: If you have the code locally, navigate to it
 cd jobboard
+
+# Option 2: If cloning from an existing repository (GitHub, etc.)
+# git clone <your-repository-url>
+# cd jobboard
+
+# Option 3: If starting fresh, create a new directory
+# mkdir jobboard
+# cd jobboard
+# Copy all application files into this directory
 ```
 
 ### Step 1.2: Install Backend Dependencies
@@ -871,12 +879,13 @@ export ALB_DNS=$(aws elbv2 describe-load-balancers \
 echo "ALB DNS: $ALB_DNS"
 
 # Create target group 1 (Blue)
+# Note: Using instance target type for ECS EC2 with bridge network mode
 aws elbv2 create-target-group \
     --name jobboard-tg-blue \
     --protocol HTTP \
     --port 80 \
     --vpc-id $VPC_ID \
-    --target-type ip \
+    --target-type instance \
     --health-check-enabled \
     --health-check-path / \
     --health-check-interval-seconds 30 \
@@ -898,7 +907,7 @@ aws elbv2 create-target-group \
     --protocol HTTP \
     --port 80 \
     --vpc-id $VPC_ID \
-    --target-type ip \
+    --target-type instance \
     --health-check-enabled \
     --health-check-path / \
     --health-check-interval-seconds 30 \
@@ -1002,12 +1011,8 @@ aws autoscaling create-auto-scaling-group \
     --tags "Key=Name,Value=jobboard-ecs-instance,PropagateAtLaunch=true" \
     --region $AWS_REGION
 
-# Enable ECS managed scaling
-aws ecs put-cluster-capacity-providers \
-    --cluster jobboard-cluster \
-    --capacity-providers FARGATE FARGATE_SPOT \
-    --default-capacity-provider-strategy capacityProvider=FARGATE,weight=1 \
-    --region $AWS_REGION
+# Note: For EC2-backed ECS clusters, capacity providers are managed through Auto Scaling Groups
+# The Auto Scaling Group created above will automatically provide capacity to the cluster
 
 # Wait for instances to register with ECS cluster (takes 2-3 minutes)
 echo "Waiting for EC2 instances to register with ECS cluster..."
@@ -1074,14 +1079,14 @@ aws ecs describe-task-definition \
 
 ```bash
 # Create ECS service with CodeDeploy deployment controller
+# Note: For EC2 launch type with bridge network mode
 aws ecs create-service \
     --cluster jobboard-cluster \
     --service-name jobboard-service \
     --task-definition jobboard-task \
     --desired-count 1 \
-    --launch-type FARGATE \
+    --launch-type EC2 \
     --deployment-controller type=CODE_DEPLOY \
-    --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_1,$SUBNET_2],securityGroups=[$ECS_SG_ID],assignPublicIp=ENABLED}" \
     --load-balancers "targetGroupArn=$TG_BLUE_ARN,containerName=frontend,containerPort=80" \
     --region $AWS_REGION
 
@@ -1111,7 +1116,61 @@ aws s3api put-bucket-versioning \
     --versioning-configuration Status=Enabled
 ```
 
-### Step 5.2: Create CodeDeploy Application
+### Step 5.2: Create CodeCommit Repository
+
+```bash
+# Create CodeCommit repository
+aws codecommit create-repository \
+    --repository-name jobboard \
+    --repository-description "JobBoard application repository" \
+    --region $AWS_REGION
+
+# Get repository clone URL
+export CODECOMMIT_URL=$(aws codecommit get-repository \
+    --repository-name jobboard \
+    --query "repositoryMetadata.cloneUrlHttp" \
+    --output text \
+    --region $AWS_REGION)
+
+echo "CodeCommit Repository URL: $CODECOMMIT_URL"
+```
+
+#### Configure Git Credentials for CodeCommit
+
+**Option 1: Using HTTPS Git credentials (Recommended for IAM users)**
+
+1. Go to AWS Console → IAM → Users → Your User
+2. Navigate to **Security credentials** tab
+3. Scroll to **HTTPS Git credentials for AWS CodeCommit**
+4. Click **Generate credentials**
+5. Download and save the credentials
+6. Use these credentials when pushing to CodeCommit
+
+**Option 2: Using AWS CLI credential helper**
+
+```bash
+# Configure Git to use AWS CLI credential helper
+git config --global credential.helper '!aws codecommit credential-helper $@'
+git config --global credential.UseHttpPath true
+```
+
+#### Initialize Git Repository (if not already done)
+
+```bash
+# If you haven't initialized git yet:
+cd /path/to/jobboard
+git init
+git add .
+git commit -m "Initial commit"
+
+# Add CodeCommit as remote
+git remote add aws $CODECOMMIT_URL
+
+# Or if you already have a remote, you can add CodeCommit as additional remote:
+# git remote add codecommit $CODECOMMIT_URL
+```
+
+### Step 5.3: Create CodeDeploy Application
 
 ```bash
 # Create CodeDeploy application
@@ -1132,24 +1191,22 @@ aws deploy create-deployment-group \
     --region $AWS_REGION
 ```
 
-### Step 5.3: Create CodeBuild Project
+### Step 5.4: Create CodeBuild Project
 
 ```bash
 # Create CodeBuild project
 aws codebuild create-project \
     --name jobboard-build \
-    --source type=GITHUB,location=https://github.com/yourusername/jobboard.git \
+    --source type=CODECOMMIT,location=https://git-codecommit.$AWS_REGION.amazonaws.com/v1/repos/jobboard \
     --artifacts type=NO_ARTIFACTS \
     --environment type=LINUX_CONTAINER,image=aws/codebuild/standard:7.0,computeType=BUILD_GENERAL1_SMALL,privilegedMode=true,environmentVariables="[{name=AWS_ACCOUNT_ID,value=$AWS_ACCOUNT_ID},{name=AWS_DEFAULT_REGION,value=$AWS_REGION}]" \
     --service-role arn:aws:iam::$AWS_ACCOUNT_ID:role/CodeBuildServiceRole \
     --region $AWS_REGION
 ```
 
-**Note:** You'll need to authorize CodeBuild to access your GitHub repository. This is easier to do via the AWS Console.
+### Step 5.5: Create CodePipeline
 
-### Step 5.4: Create CodePipeline
-
-It's recommended to create CodePipeline via the AWS Console for easier GitHub integration:
+It's recommended to create CodePipeline via the AWS Console for easier configuration:
 
 #### Via AWS Console:
 
@@ -1162,11 +1219,10 @@ It's recommended to create CodePipeline via the AWS Console for easier GitHub in
    - Click **Next**
 
 4. **Source stage:**
-   - Source provider: **GitHub (Version 2)**
-   - Click **Connect to GitHub**
-   - Create a new connection, name it `jobboard-github`
-   - Authorize AWS to access your GitHub
-   - Select your repository and branch
+   - Source provider: **AWS CodeCommit**
+   - Repository name: `jobboard`
+   - Branch name: `main` (or `master`)
+   - Change detection options: **Amazon CloudWatch Events** (recommended)
    - Output artifact format: **CodePipeline default**
    - Click **Next**
 
@@ -1185,15 +1241,21 @@ It's recommended to create CodePipeline via the AWS Console for easier GitHub in
 
 7. **Review** and click **Create pipeline**
 
-### Step 5.5: Push Code to GitHub
+### Step 5.6: Push Code to CodeCommit
 
 ```bash
 # Make sure all files are committed
 git add .
 git commit -m "Add AWS deployment configuration"
 
-# Push to GitHub
-git push origin main
+# Add CodeCommit as remote (if not already added)
+git remote add aws https://git-codecommit.$AWS_REGION.amazonaws.com/v1/repos/jobboard
+
+# Or if you want to replace origin:
+# git remote set-url origin https://git-codecommit.$AWS_REGION.amazonaws.com/v1/repos/jobboard
+
+# Push to CodeCommit
+git push aws main
 ```
 
 The pipeline will automatically trigger!
@@ -2080,24 +2142,7 @@ aws ecs describe-task-definition \
 
 ### Estimated Monthly Costs
 
-- **ECS Fargate (1 task, 1 vCPU, 2GB)**: ~$30/month
-- **RDS t3.micro**: ~$15/month
-- **ALB**: ~$18/month
-- **ECR storage**: ~$1/month (for 10GB)
-- **Data transfer**: Variable
-- **Total**: ~$65-75/month
-
-### Cost Reduction Tips
-
-1. **Use Fargate Spot** (for dev/test):
-```bash
-# Update service to use Fargate Spot
-aws ecs update-service \
-    --cluster jobboard-cluster \
-    --service jobboard-service \
-    --capacity-provider-strategy capacityProvider=FARGATE_SPOT,weight=1 \
-    --region $AWS_REGION
-```2 t3.small (2 instances, on-demand)**: ~$30/month
+- **EC2 instances - 2 t3.small (on-demand)**: ~$30/month
 - **EBS storage (2 x 30GB)**: ~$6/month
 - **RDS t3.micro**: ~$15/month
 - **ALB**: ~$18/month
@@ -2106,6 +2151,29 @@ aws ecs update-service \
 - **Total**: ~$70-80/month
 
 ### Cost Reduction Tips
+
+1. **Use EC2 Spot Instances** (for dev/test):
+```bash
+# Update Auto Scaling Group to use Spot instances
+# Create a new launch template with Spot instance request
+aws ec2 create-launch-template \
+    --launch-template-name jobboard-ecs-spot-template \
+    --version-description "Spot instance template" \
+    --launch-template-data '{
+        "InstanceType": "t3.small",
+        "ImageId": "'$ECS_AMI'",
+        "IamInstanceProfile": {"Name": "ecsInstanceRole"},
+        "SecurityGroupIds": ["'$ECS_SG_ID'"],
+        "InstanceMarketOptions": {
+            "MarketType": "spot",
+            "SpotOptions": {"MaxPrice": "0.02"}
+        },
+        "UserData": "'$(base64 -w 0 user-data.txt)'"
+    }' \
+    --region $AWS_REGION
+```
+
+2. **Reduce EC2 instance size** (t3.micro for very small workloads):
 
 1. **Use EC2 Spot Instances** (for dev/test - up to 90% savings):
 ```bash
